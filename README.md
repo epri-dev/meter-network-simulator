@@ -43,3 +43,5 @@ Note that this command is run on the *host* Linux computer and not within the co
 
 ![gnuplot output](/images/802.15.4-psr-distance.png?raw=true "Sample graphical output")
 
+The full manual for this software is available from EPRI:  https://www.epri.com/research/products/000000003002024109
+
