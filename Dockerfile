@@ -16,5 +16,9 @@ CMD ["scratch-simulator.cc"]
 
 FROM builder
 RUN dnf install -y doxygen dia python3-sphinx texlive-collection-fontsrecommended \
-    texlive-collection-latexextra
+    texlive-collection-latexextra latexmk dvipng doxygen graphviz dia
+WORKDIR /tmp/ns-3-dev/
+RUN ./ns3 configure --build-profile=debug --enable-examples --enable-tests
 RUN ./ns3 docs all
+ENTRYPOINT [""]
+CMD [""]
