@@ -4,6 +4,8 @@ Simulate an Advanced Metering Infrastructure (AMI) network.
 
 This is a self-contained version of [ns-3](https://www.nsnam.org/) that is intended to be used as a base with which to model AMI networks.  It builds and runs in a [podman](https://podman.io) or [Docker](https://www.docker.com) container.
 
+The full manual for this software is available from EPRI:  https://www.epri.com/research/products/000000003002024109
+
 ## Building
 ### Note:
 > Although these instructions use `podman`, either `podman` or `docker` may be used.  Simply substitude `docker` for `podman` in each of the following sections.
@@ -43,5 +45,5 @@ Note that this command is run on the *host* Linux computer and not within the co
 
 ![gnuplot output](/images/802.15.4-psr-distance.png?raw=true "Sample graphical output")
 
-The full manual for this software is available from EPRI:  https://www.epri.com/research/products/000000003002024109
-
+## Advanced usage
+A container is convenient and useful to avoid having to do a lot of manual configuration, but for those interested in modifying or adapting the models, it is definitely faster to run the simulator natively on the host Fedora Linux machine.  To do so, install `ns-3` per the instructions on the tool's [web site](https://www.nsnam.org/), copy the contents of the `epri` directory from this project to the `scratch` directory within the newly installed `ns-3` installation and enjoy experimenting!
