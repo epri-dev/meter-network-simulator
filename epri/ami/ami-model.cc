@@ -36,15 +36,29 @@
 
 using namespace ns3;
 
-void
-CourseChange (std::string context, Ptr<const MobilityModel> model)
-{
-  Vector position = model->GetPosition ();
-  NS_LOG_UNCOND (context << 
-    " x = " << position.x << ", y = " << position.y);
-}
-
 NS_LOG_COMPONENT_DEFINE ("EPRI_AMI");
+
+class AmiExample
+{
+  public:
+    AmiExample() = default;
+    /**
+     * Run function
+     * \param nWifi The number of nodes
+     * \param areaWidth The width of the simulation area in meters
+     * \param areaHeight The height of the simulation area in meters
+     * \param verbose Tell echo applications to log if true
+     * \param tracing Enable pcap tracing
+     */
+    void CaseRun(uint32_t nWifi, 
+                 unsigned areaWidth,
+                 unsigned areaHeight,
+                 bool verbose,
+                 bool tracing);
+  private:
+    /// Create and initialize all nodes
+    NodeContainer CreateNodes(uint32_t nWifi);
+};
 
 int 
 main (int argc, char *argv[])
@@ -52,32 +66,40 @@ main (int argc, char *argv[])
   bool verbose = true;
   uint32_t nWifi = 3;
   bool tracing = false;
+  unsigned areaWidth = 50;
+  unsigned areaHeight = 50;
 
   CommandLine cmd (__FILE__);
   cmd.AddValue ("nWifi", "Number of wifi STA devices", nWifi);
   cmd.AddValue ("verbose", "Tell echo applications to log if true", verbose);
   cmd.AddValue ("tracing", "Enable pcap tracing", tracing);
+  cmd.AddValue ("areaWidth", "Set width of simulation area in meters", areaWidth);
+  cmd.AddValue ("areaHeight", "Set height of simulation area in meters", areaHeight);
 
   cmd.Parse (argc,argv);
-
-  // The underlying restriction of 18 is due to the grid position
-  // allocator's configuration; the grid layout will exceed the
-  // bounding box if more than 18 nodes are provided.
-  if (nWifi > 18)
-    {
-      std::cout << "nWifi should be 18 or less; otherwise grid layout exceeds the bounding box" << std::endl;
-      return 1;
-    }
 
   if (verbose)
     {
       LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
       LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
     }
+  AmiExample test = AmiExample();
+  test.CaseRun(nWifi, 
+               areaWidth,
+               areaHeight,
+               verbose,
+               tracing);
+}
 
-  NodeContainer wifiStaNodes;
-  wifiStaNodes.Create (nWifi);
-  NodeContainer wifiApNode = wifiStaNodes.Get (0);
+void
+AmiExample::CaseRun(uint32_t nWifi,
+                    unsigned areaWidth,
+                    unsigned areaHeight,
+                    bool verbose,
+                    bool tracing)
+{
+  NodeContainer wifiStaNodes = CreateNodes(nWifi);
+  NodeContainer wifiApNode = wifiStaNodes.Get(0);
 
   YansWifiChannelHelper channel = YansWifiChannelHelper::Default ();
   YansWifiPhyHelper phy;
@@ -100,21 +122,16 @@ main (int argc, char *argv[])
   apDevices = wifi.Install (phy, mac, wifiApNode);
 
   MobilityHelper mobility;
-
-  mobility.SetPositionAllocator ("ns3::GridPositionAllocator",
-                                 "MinX", DoubleValue (0.0),
-                                 "MinY", DoubleValue (0.0),
-                                 "DeltaX", DoubleValue (5.0),
-                                 "DeltaY", DoubleValue (10.0),
-                                 "GridWidth", UintegerValue (3),
-                                 "LayoutType", StringValue ("RowFirst"));
-
-  mobility.SetMobilityModel ("ns3::RandomWalk2dMobilityModel",
-                             "Bounds", RectangleValue (Rectangle (-50, 50, -50, 50)));
-  mobility.Install (wifiStaNodes);
-
+  std::ostringstream widthStream;
+  widthStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaWidth << "]";
+  std::ostringstream heightStream;
+  heightStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaHeight << "]";
+  mobility.SetPositionAllocator("ns3::RandomRectanglePositionAllocator",
+                                "X", StringValue(widthStream.str()),
+                                "Y", StringValue(heightStream.str())
+                                );
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  mobility.Install (wifiApNode);
+  mobility.Install (wifiStaNodes);
 
   Ipv6ListRoutingHelper listRh;
   Ipv6StaticRoutingHelper staticRh;
@@ -151,15 +168,17 @@ main (int argc, char *argv[])
   if (tracing)
     {
       phy.SetPcapDataLinkType (WifiPhyHelper::DLT_IEEE802_11_RADIO);
-      phy.EnablePcap ("third", apDevices.Get (0));
+      phy.EnablePcap ("ami", apDevices.Get (0));
     }
 
-  std::ostringstream oss;
-  oss << 
-    "/NodeList/" << wifiStaNodes.Get (nWifi - 1)->GetId ()  <<
-    "/$ns3::MobilityModel/CourseChange";
-  Config::Connect (oss.str (), MakeCallback (&CourseChange));
   Simulator::Run ();
   Simulator::Destroy ();
-  return 0;
+}
+
+NodeContainer
+AmiExample::CreateNodes(uint32_t nWifi)
+{
+  NodeContainer wifiStaNodes;
+  wifiStaNodes.Create(nWifi);
+  return wifiStaNodes;
 }
