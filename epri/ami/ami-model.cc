@@ -58,6 +58,8 @@ class AmiExample
   private:
     /// Create and initialize all nodes
     NodeContainer CreateNodes(uint32_t nWifi);
+    /// Create a fixed mobility helper within the area
+    MobilityHelper CreateMobility(unsigned areaWidth, unsigned areaHeight);
 };
 
 int 
@@ -121,16 +123,7 @@ AmiExample::CaseRun(uint32_t nWifi,
                "Ssid", SsidValue(ssid));
   apDevices = wifi.Install(phy, mac, wifiApNode);
 
-  MobilityHelper mobility;
-  std::ostringstream widthStream;
-  widthStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaWidth << "]";
-  std::ostringstream heightStream;
-  heightStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaHeight << "]";
-  mobility.SetPositionAllocator("ns3::RandomRectanglePositionAllocator",
-                                "X", StringValue(widthStream.str()),
-                                "Y", StringValue(heightStream.str())
-                                );
-  mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+  MobilityHelper mobility = CreateMobility(areaWidth, areaHeight);
   mobility.Install(wifiStaNodes);
 
   Ipv6ListRoutingHelper listRh;
@@ -181,4 +174,20 @@ AmiExample::CreateNodes(uint32_t nWifi)
   NodeContainer wifiStaNodes;
   wifiStaNodes.Create(nWifi);
   return wifiStaNodes;
+}
+
+MobilityHelper
+AmiExample::CreateMobility(unsigned areaWidth, unsigned areaHeight)
+{
+  MobilityHelper mobility;
+  std::ostringstream widthStream;
+  widthStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaWidth << "]";
+  std::ostringstream heightStream;
+  heightStream << "ns3::UniformRandomVariable[Min=0|Max=" << areaHeight << "]";
+  mobility.SetPositionAllocator("ns3::RandomRectanglePositionAllocator",
+                                "X", StringValue(widthStream.str()),
+                                "Y", StringValue(heightStream.str())
+                                );
+  mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+  return mobility;
 }
