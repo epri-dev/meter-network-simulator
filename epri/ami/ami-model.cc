@@ -36,7 +36,7 @@
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("EPRI_AMI");
+NS_LOG_COMPONENT_DEFINE("EPRI_AMI");
 
 class AmiExample
 {
@@ -61,7 +61,7 @@ class AmiExample
 };
 
 int 
-main (int argc, char *argv[])
+main(int argc, char *argv[])
 {
   bool verbose = true;
   uint32_t nWifi = 3;
@@ -69,19 +69,19 @@ main (int argc, char *argv[])
   unsigned areaWidth = 50;
   unsigned areaHeight = 50;
 
-  CommandLine cmd (__FILE__);
-  cmd.AddValue ("nWifi", "Number of wifi STA devices", nWifi);
-  cmd.AddValue ("verbose", "Tell echo applications to log if true", verbose);
-  cmd.AddValue ("tracing", "Enable pcap tracing", tracing);
-  cmd.AddValue ("areaWidth", "Set width of simulation area in meters", areaWidth);
-  cmd.AddValue ("areaHeight", "Set height of simulation area in meters", areaHeight);
+  CommandLine cmd(__FILE__);
+  cmd.AddValue("nWifi", "Number of wifi STA devices", nWifi);
+  cmd.AddValue("verbose", "Tell echo applications to log if true", verbose);
+  cmd.AddValue("tracing", "Enable pcap tracing", tracing);
+  cmd.AddValue("areaWidth", "Set width of simulation area in meters", areaWidth);
+  cmd.AddValue("areaHeight", "Set height of simulation area in meters", areaHeight);
 
-  cmd.Parse (argc,argv);
+  cmd.Parse(argc,argv);
 
-  if (verbose)
+  if(verbose)
     {
-      LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-      LogComponentEnable ("UdpEchoServerApplication", LOG_LEVEL_INFO);
+      LogComponentEnable("UdpEchoClientApplication", LOG_LEVEL_INFO);
+      LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
     }
   AmiExample test = AmiExample();
   test.CaseRun(nWifi, 
@@ -101,25 +101,25 @@ AmiExample::CaseRun(uint32_t nWifi,
   NodeContainer wifiStaNodes = CreateNodes(nWifi);
   NodeContainer wifiApNode = wifiStaNodes.Get(0);
 
-  YansWifiChannelHelper channel = YansWifiChannelHelper::Default ();
+  YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
   YansWifiPhyHelper phy;
-  phy.SetChannel (channel.Create ());
+  phy.SetChannel(channel.Create());
 
   WifiMacHelper mac;
-  Ssid ssid = Ssid ("ns-3-ssid");
+  Ssid ssid = Ssid("ns-3-ssid");
 
   WifiHelper wifi;
 
   NetDeviceContainer staDevices;
-  mac.SetType ("ns3::StaWifiMac",
-               "Ssid", SsidValue (ssid),
-               "ActiveProbing", BooleanValue (false));
-  staDevices = wifi.Install (phy, mac, wifiStaNodes);
+  mac.SetType("ns3::StaWifiMac",
+               "Ssid", SsidValue(ssid),
+               "ActiveProbing", BooleanValue(false));
+  staDevices = wifi.Install(phy, mac, wifiStaNodes);
 
   NetDeviceContainer apDevices;
-  mac.SetType ("ns3::ApWifiMac",
-               "Ssid", SsidValue (ssid));
-  apDevices = wifi.Install (phy, mac, wifiApNode);
+  mac.SetType("ns3::ApWifiMac",
+               "Ssid", SsidValue(ssid));
+  apDevices = wifi.Install(phy, mac, wifiApNode);
 
   MobilityHelper mobility;
   std::ostringstream widthStream;
@@ -130,8 +130,8 @@ AmiExample::CaseRun(uint32_t nWifi,
                                 "X", StringValue(widthStream.str()),
                                 "Y", StringValue(heightStream.str())
                                 );
-  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  mobility.Install (wifiStaNodes);
+  mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+  mobility.Install(wifiStaNodes);
 
   Ipv6ListRoutingHelper listRh;
   Ipv6StaticRoutingHelper staticRh;
@@ -145,34 +145,34 @@ AmiExample::CaseRun(uint32_t nWifi,
   Ipv6AddressHelper address;
   address.SetBase(Ipv6Address("2001:1::"), Ipv6Prefix(64));
 
-  Ipv6InterfaceContainer staInterfaces = address.Assign (staDevices);
-  address.Assign (apDevices);
+  Ipv6InterfaceContainer staInterfaces = address.Assign(staDevices);
+  address.Assign(apDevices);
 
-  UdpEchoServerHelper echoServer (9);
+  UdpEchoServerHelper echoServer(9);
 
-  ApplicationContainer serverApps = echoServer.Install (wifiStaNodes.Get (0));
-  serverApps.Start (Seconds (1.0));
-  serverApps.Stop (Seconds (10.0));
+  ApplicationContainer serverApps = echoServer.Install(wifiStaNodes.Get(0));
+  serverApps.Start(Seconds(1.0));
+  serverApps.Stop(Seconds(10.0));
 
-  UdpEchoClientHelper echoClient (staInterfaces.GetAddress (0, 1), 9);
-  echoClient.SetAttribute ("MaxPackets", UintegerValue (1));
-  echoClient.SetAttribute ("Interval", TimeValue (Seconds (1.0)));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (1024));
+  UdpEchoClientHelper echoClient(staInterfaces.GetAddress(0, 1), 9);
+  echoClient.SetAttribute("MaxPackets", UintegerValue(1));
+  echoClient.SetAttribute("Interval", TimeValue(Seconds(1.0)));
+  echoClient.SetAttribute("PacketSize", UintegerValue(1024));
 
   ApplicationContainer clientApps = echoClient.Install(wifiApNode);
-  clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (10.0));
+  clientApps.Start(Seconds(2.0));
+  clientApps.Stop(Seconds(10.0));
 
-  Simulator::Stop (Seconds (10.0));
+  Simulator::Stop(Seconds(10.0));
 
-  if (tracing)
+  if(tracing)
     {
-      phy.SetPcapDataLinkType (WifiPhyHelper::DLT_IEEE802_11_RADIO);
-      phy.EnablePcap ("ami", apDevices.Get (0));
+      phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
+      phy.EnablePcap("ami", apDevices.Get(0));
     }
 
-  Simulator::Run ();
-  Simulator::Destroy ();
+  Simulator::Run();
+  Simulator::Destroy();
 }
 
 NodeContainer
