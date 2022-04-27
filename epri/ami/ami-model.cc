@@ -53,6 +53,8 @@ class AmiExample
     void CaseRun(uint32_t nAmiNodes, 
                  unsigned areaWidth,
                  unsigned areaHeight,
+                 double durationSeconds,
+                 bool useMeshUnder,
                  bool verbose,
                  bool tracing);
   private:
@@ -68,11 +70,15 @@ main(int argc, char *argv[])
   bool verbose = true;
   uint32_t nAmiNodes = 3;
   bool tracing = false;
+  bool useMeshUnder = false;
   unsigned areaWidth = 50;
   unsigned areaHeight = 50;
+  double durationSeconds = 10.0;
 
   CommandLine cmd(__FILE__);
   cmd.AddValue("nAmiNodes", "Number of AMI devices", nAmiNodes);
+  cmd.AddValue("durationSeconds", "Number seconds to run the simulation", durationSeconds);
+  cmd.AddValue("useMeshUnder", "Use mesh-under LR-WPAN routing if true", useMeshUnder);
   cmd.AddValue("verbose", "Tell echo applications to log if true", verbose);
   cmd.AddValue("tracing", "Enable pcap tracing", tracing);
   cmd.AddValue("areaWidth", "Set width of simulation area in meters", areaWidth);
@@ -89,6 +95,8 @@ main(int argc, char *argv[])
   test.CaseRun(nAmiNodes, 
                areaWidth,
                areaHeight,
+               durationSeconds,
+               useMeshUnder,
                verbose,
                tracing);
 }
@@ -97,6 +105,8 @@ void
 AmiExample::CaseRun(uint32_t nAmiNodes,
                     unsigned areaWidth,
                     unsigned areaHeight,
+                    double durationSeconds,
+                    bool useMeshUnder,
                     bool verbose,
                     bool tracing)
 {
@@ -132,12 +142,22 @@ AmiExample::CaseRun(uint32_t nAmiNodes,
   staInterfaces = address.Assign(amiDevices);
   staInterfaces.SetForwarding(0, true);
   staInterfaces.SetDefaultRouteInAllNodes(0);
+ 
+  if (useMeshUnder) 
+  {
+      for (uint32_t i = 0; i < amiDevices.GetN(); i++)
+      {
+          Ptr<NetDevice> dev = amiDevices.Get(i);
+          dev->SetAttribute("UseMeshUnder", BooleanValue(true));
+          dev->SetAttribute("MeshUnderRadius", UintegerValue(10));
+      }
+  }
 
   // install the echo server on the last node
   UdpEchoServerHelper echoServer(9);
   ApplicationContainer serverApps = echoServer.Install(amiNodes.Get(nAmiNodes - 1));
   serverApps.Start(Seconds(1.0));
-  serverApps.Stop(Seconds(10.0));
+  serverApps.Stop(Seconds(durationSeconds));
 
   // install the echo server on the first node
   UdpEchoClientHelper echoClient(staInterfaces.GetAddress(nAmiNodes - 1, 1), 9);
@@ -146,10 +166,10 @@ AmiExample::CaseRun(uint32_t nAmiNodes,
   echoClient.SetAttribute("PacketSize", UintegerValue(1024));
   ApplicationContainer clientApps = echoClient.Install(amiNodes.Get(0));
 
-  clientApps.Start(Seconds(2.0));
-  clientApps.Stop(Seconds(10.0));
+  clientApps.Start(Seconds(3.0));
+  clientApps.Stop(Seconds(durationSeconds));
 
-  Simulator::Stop(Seconds(10.0));
+  Simulator::Stop(Seconds(durationSeconds));
 
   if(tracing)
   {
