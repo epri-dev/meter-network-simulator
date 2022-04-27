@@ -19,8 +19,8 @@
 #include "ns3/network-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/mobility-module.h"
-#include "ns3/csma-module.h"
 #include "ns3/internet-module.h"
+#include "ns3/lr-wpan-module.h"
 #include "ns3/sixlowpan-module.h"
 #include "ns3/ipv6-list-routing-helper.h"
 #include "ns3/ssid.h"
@@ -44,20 +44,20 @@ class AmiExample
     AmiExample() = default;
     /**
      * Run function
-     * \param nWifi The number of nodes
+     * \param nAmiNodes The number of nodes
      * \param areaWidth The width of the simulation area in meters
      * \param areaHeight The height of the simulation area in meters
      * \param verbose Tell echo applications to log if true
      * \param tracing Enable pcap tracing
      */
-    void CaseRun(uint32_t nWifi, 
+    void CaseRun(uint32_t nAmiNodes, 
                  unsigned areaWidth,
                  unsigned areaHeight,
                  bool verbose,
                  bool tracing);
   private:
     /// Create and initialize all nodes
-    NodeContainer CreateNodes(uint32_t nWifi);
+    NodeContainer CreateNodes(uint32_t nAmiNodes);
     /// Create a fixed mobility helper within the area
     MobilityHelper CreateMobility(unsigned areaWidth, unsigned areaHeight);
 };
@@ -66,13 +66,13 @@ int
 main(int argc, char *argv[])
 {
   bool verbose = true;
-  uint32_t nWifi = 3;
+  uint32_t nAmiNodes = 3;
   bool tracing = false;
   unsigned areaWidth = 50;
   unsigned areaHeight = 50;
 
   CommandLine cmd(__FILE__);
-  cmd.AddValue("nWifi", "Number of wifi STA devices", nWifi);
+  cmd.AddValue("nAmiNodes", "Number of AMI devices", nAmiNodes);
   cmd.AddValue("verbose", "Tell echo applications to log if true", verbose);
   cmd.AddValue("tracing", "Enable pcap tracing", tracing);
   cmd.AddValue("areaWidth", "Set width of simulation area in meters", areaWidth);
@@ -86,7 +86,7 @@ main(int argc, char *argv[])
       LogComponentEnable("UdpEchoServerApplication", LOG_LEVEL_INFO);
     }
   AmiExample test = AmiExample();
-  test.CaseRun(nWifi, 
+  test.CaseRun(nAmiNodes, 
                areaWidth,
                areaHeight,
                verbose,
@@ -94,53 +94,28 @@ main(int argc, char *argv[])
 }
 
 void
-AmiExample::CaseRun(uint32_t nWifi,
+AmiExample::CaseRun(uint32_t nAmiNodes,
                     unsigned areaWidth,
                     unsigned areaHeight,
                     bool verbose,
                     bool tracing)
 {
-  NodeContainer wifiStaNodes = CreateNodes(nWifi);
-  NodeContainer wifiApNode = wifiStaNodes.Get(0);
+  NodeContainer amiNodes = CreateNodes(nAmiNodes);
 
-#if 0
-  YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
-  YansWifiPhyHelper phy;
-  phy.SetChannel(channel.Create());
+  LrWpanHelper lrWpanHelper;
+  // Add and install the LrWpanNetDevice for each node
+  NetDeviceContainer lrwpanDevices = lrWpanHelper.Install(amiNodes);
 
-  WifiMacHelper mac;
-  Ssid ssid = Ssid("ns-3-ssid");
-
-  WifiHelper wifi;
-
-  NetDeviceContainer staDevices;
-  mac.SetType("ns3::StaWifiMac",
-               "Ssid", SsidValue(ssid),
-               "ActiveProbing", BooleanValue(false));
-  staDevices = wifi.Install(phy, mac, wifiStaNodes);
-
-  NetDeviceContainer apDevices;
-  mac.SetType("ns3::ApWifiMac"
-               "Ssid", SsidValue(ssid));
-  apDevices = wifi.Install(phy, mac, wifiApNode);
-#else
-  // create channels
-  NS_LOG_INFO("Create channels.");
-  CsmaHelper csma;
-  csma.SetChannelAttribute("DataRate", DataRateValue(5000000));
-  csma.SetChannelAttribute("Delay", TimeValue(MilliSeconds(2)));
-  NetDeviceContainer apDevices = csma.Install(wifiApNode);
-  csma.SetDeviceAttribute("Mtu", UintegerValue(150));
-  NetDeviceContainer staDevices = csma.Install(wifiStaNodes);
-
-  SixLowPanHelper sixlowpan;
-  sixlowpan.SetDeviceAttribute("ForceEtherType", BooleanValue(true));
-  staDevices = sixlowpan.Install(staDevices);
-
-#endif
+  // Fake PAN association and short address assignment.
+  // This is needed because the lr-wpan module does not provide (yet)
+  // a full PAN association procedure.
+  lrWpanHelper.AssociateToPan(lrwpanDevices, 0);
+  
+  SixLowPanHelper sixLowPanHelper;
+  NetDeviceContainer amiDevices = sixLowPanHelper.Install(lrwpanDevices);
 
   MobilityHelper mobility = CreateMobility(areaWidth, areaHeight);
-  mobility.Install(wifiStaNodes);
+  mobility.Install(amiNodes);
 
   Ipv6ListRoutingHelper listRh;
   Ipv6StaticRoutingHelper staticRh;
@@ -149,46 +124,50 @@ AmiExample::CaseRun(uint32_t nWifi,
   InternetStackHelper stack;
   stack.SetIpv4StackInstall(false); // IPv6 only
   stack.SetRoutingHelper(listRh);
-  stack.Install(wifiStaNodes);
+  stack.Install(amiNodes);
 
   Ipv6AddressHelper address;
   address.SetBase(Ipv6Address("2001:1::"), Ipv6Prefix(64));
+  Ipv6InterfaceContainer staInterfaces;
+  staInterfaces = address.Assign(amiDevices);
+  staInterfaces.SetForwarding(0, true);
+  staInterfaces.SetDefaultRouteInAllNodes(0);
 
-  Ipv6InterfaceContainer staInterfaces = address.Assign(staDevices);
-  address.Assign(apDevices);
-
+  // install the echo server on the last node
   UdpEchoServerHelper echoServer(9);
-
-  ApplicationContainer serverApps = echoServer.Install(wifiStaNodes.Get(0));
+  ApplicationContainer serverApps = echoServer.Install(amiNodes.Get(nAmiNodes - 1));
   serverApps.Start(Seconds(1.0));
   serverApps.Stop(Seconds(10.0));
 
-  UdpEchoClientHelper echoClient(staInterfaces.GetAddress(0, 1), 9);
+  // install the echo server on the first node
+  UdpEchoClientHelper echoClient(staInterfaces.GetAddress(nAmiNodes - 1, 1), 9);
   echoClient.SetAttribute("MaxPackets", UintegerValue(1));
   echoClient.SetAttribute("Interval", TimeValue(Seconds(1.0)));
   echoClient.SetAttribute("PacketSize", UintegerValue(1024));
+  ApplicationContainer clientApps = echoClient.Install(amiNodes.Get(0));
 
-  ApplicationContainer clientApps = echoClient.Install(wifiApNode);
   clientApps.Start(Seconds(2.0));
   clientApps.Stop(Seconds(10.0));
 
   Simulator::Stop(Seconds(10.0));
 
   if(tracing)
-    {
-      csma.EnablePcap("ami", apDevices.Get(0));
-    }
+  {
+      lrWpanHelper.EnablePcap("ami", lrwpanDevices.Get(0));
+      lrWpanHelper.EnablePcap("ami", lrwpanDevices.Get(nAmiNodes - 1));
+      //lrWpanHelper.EnablePcapAll("ami", true);
+  }
 
   Simulator::Run();
   Simulator::Destroy();
 }
 
 NodeContainer
-AmiExample::CreateNodes(uint32_t nWifi)
+AmiExample::CreateNodes(uint32_t nAmiNodes)
 {
-  NodeContainer wifiStaNodes;
-  wifiStaNodes.Create(nWifi);
-  return wifiStaNodes;
+  NodeContainer amiNodes;
+  amiNodes.Create(nAmiNodes);
+  return amiNodes;
 }
 
 MobilityHelper
