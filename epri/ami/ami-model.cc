@@ -21,7 +21,7 @@
 #include "ns3/mobility-module.h"
 #include "ns3/csma-module.h"
 #include "ns3/internet-module.h"
-#include "ns3/yans-wifi-helper.h"
+#include "ns3/sixlowpan-module.h"
 #include "ns3/ipv6-list-routing-helper.h"
 #include "ns3/ssid.h"
 
@@ -103,6 +103,7 @@ AmiExample::CaseRun(uint32_t nWifi,
   NodeContainer wifiStaNodes = CreateNodes(nWifi);
   NodeContainer wifiApNode = wifiStaNodes.Get(0);
 
+#if 0
   YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
   YansWifiPhyHelper phy;
   phy.SetChannel(channel.Create());
@@ -119,9 +120,24 @@ AmiExample::CaseRun(uint32_t nWifi,
   staDevices = wifi.Install(phy, mac, wifiStaNodes);
 
   NetDeviceContainer apDevices;
-  mac.SetType("ns3::ApWifiMac",
+  mac.SetType("ns3::ApWifiMac"
                "Ssid", SsidValue(ssid));
   apDevices = wifi.Install(phy, mac, wifiApNode);
+#else
+  // create channels
+  NS_LOG_INFO("Create channels.");
+  CsmaHelper csma;
+  csma.SetChannelAttribute("DataRate", DataRateValue(5000000));
+  csma.SetChannelAttribute("Delay", TimeValue(MilliSeconds(2)));
+  NetDeviceContainer apDevices = csma.Install(wifiApNode);
+  csma.SetDeviceAttribute("Mtu", UintegerValue(150));
+  NetDeviceContainer staDevices = csma.Install(wifiStaNodes);
+
+  SixLowPanHelper sixlowpan;
+  sixlowpan.SetDeviceAttribute("ForceEtherType", BooleanValue(true));
+  staDevices = sixlowpan.Install(staDevices);
+
+#endif
 
   MobilityHelper mobility = CreateMobility(areaWidth, areaHeight);
   mobility.Install(wifiStaNodes);
@@ -160,8 +176,7 @@ AmiExample::CaseRun(uint32_t nWifi,
 
   if(tracing)
     {
-      phy.SetPcapDataLinkType(WifiPhyHelper::DLT_IEEE802_11_RADIO);
-      phy.EnablePcap("ami", apDevices.Get(0));
+      csma.EnablePcap("ami", apDevices.Get(0));
     }
 
   Simulator::Run();
