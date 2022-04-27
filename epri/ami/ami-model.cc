@@ -54,6 +54,7 @@ class AmiExample
                  unsigned areaWidth,
                  unsigned areaHeight,
                  double durationSeconds,
+                 double clientStartTime,
                  bool useMeshUnder,
                  bool verbose,
                  bool tracing);
@@ -74,10 +75,12 @@ main(int argc, char *argv[])
   unsigned areaWidth = 50;
   unsigned areaHeight = 50;
   double durationSeconds = 10.0;
+  double clientStartTime = 4.0;
 
   CommandLine cmd(__FILE__);
   cmd.AddValue("nAmiNodes", "Number of AMI devices", nAmiNodes);
   cmd.AddValue("durationSeconds", "Number seconds to run the simulation", durationSeconds);
+  cmd.AddValue("clientStartTime", "Number seconds to wait before starting client", clientStartTime);
   cmd.AddValue("useMeshUnder", "Use mesh-under LR-WPAN routing if true", useMeshUnder);
   cmd.AddValue("verbose", "Tell echo applications to log if true", verbose);
   cmd.AddValue("tracing", "Enable pcap tracing", tracing);
@@ -96,6 +99,7 @@ main(int argc, char *argv[])
                areaWidth,
                areaHeight,
                durationSeconds,
+               clientStartTime,
                useMeshUnder,
                verbose,
                tracing);
@@ -106,6 +110,7 @@ AmiExample::CaseRun(uint32_t nAmiNodes,
                     unsigned areaWidth,
                     unsigned areaHeight,
                     double durationSeconds,
+                    double clientStartTime,
                     bool useMeshUnder,
                     bool verbose,
                     bool tracing)
@@ -166,16 +171,19 @@ AmiExample::CaseRun(uint32_t nAmiNodes,
   echoClient.SetAttribute("PacketSize", UintegerValue(1024));
   ApplicationContainer clientApps = echoClient.Install(amiNodes.Get(0));
 
-  clientApps.Start(Seconds(3.0));
+  clientApps.Start(Seconds(clientStartTime));
   clientApps.Stop(Seconds(durationSeconds));
 
   Simulator::Stop(Seconds(durationSeconds));
 
   if(tracing)
   {
+#if 1
       lrWpanHelper.EnablePcap("ami", lrwpanDevices.Get(0));
       lrWpanHelper.EnablePcap("ami", lrwpanDevices.Get(nAmiNodes - 1));
-      //lrWpanHelper.EnablePcapAll("ami", true);
+#else
+      lrWpanHelper.EnablePcapAll("ami", true);
+#endif
   }
 
   Simulator::Run();
